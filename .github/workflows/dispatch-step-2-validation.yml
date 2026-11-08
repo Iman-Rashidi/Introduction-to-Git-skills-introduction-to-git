@@ -1,0 +1,45 @@
+name: One-time Step 2 validation dispatcher
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/dispatch-step-2-validation.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  dispatch-step-2:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full commit history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Send the expected post-commit event to Mona
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          commit_count="$(git rev-list --count HEAD)"
+          commit_messages="$(git log --format=%s -n 100 | jq -R '{message: .}' | jq -s -c .)"
+
+          payload="$(jq -n \
+            --argjson count "$commit_count" \
+            --argjson messages "$commit_messages" \
+            '{
+              event_type: "post-commit",
+              client_payload: {
+                branch_commit_count: $count,
+                branch_commit_messages: $messages
+              }
+            }'
+          )"
+
+          gh api --method POST "repos/$REPOSITORY/dispatches" --input - <<< "$payload"

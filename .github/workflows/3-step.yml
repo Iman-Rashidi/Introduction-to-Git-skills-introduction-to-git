@@ -4,6 +4,9 @@ on:
   repository_dispatch:
     types:
       - post-checkout
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -27,7 +30,7 @@ jobs:
       ISSUE_NUMBER: ${{ needs.find_exercise.outputs.issue-number }}
 
     # Don't check unless branch is main
-    if: ${{ github.event.client_payload.branch_name == 'main' }}
+    if: ${{ (github.event_name == 'repository_dispatch' && github.event.client_payload.branch_name == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
 
     steps:
       - name: Checkout
@@ -64,9 +67,10 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@v6
         env:
-          previous_head: ${{ github.event.client_payload.previous_head }}
-          new_head: ${{ github.event.client_payload.new_head }}
-          branch_name: ${{ github.event.client_payload.branch_name }}
+          previous_head: ${{ github.event.client_payload.previous_head || github.event.before }}
+          new_head: ${{ github.event.client_payload.new_head || github.sha }}
+          branch_name: ${{ github.event.client_payload.branch_name || github.ref_name }}
+          expected_head: ${{ github.sha }}
           required_count: 2
         with:
           script: |
@@ -74,12 +78,14 @@ jobs:
             const previous_head = process.env.previous_head || "";
             const new_head = process.env.new_head || "";
             const branch_name = process.env.branch_name || "";
+            const expected_head = process.env.expected_head || "";
 
-            // Fail the workflow if they have not returned to top of the branch
             console.log(`Previous HEAD: ${previous_head}`);
             console.log(`New HEAD: ${new_head}`);
             console.log(`Branch Name: ${branch_name}`);
-            // (check pending)
+            if (branch_name !== "main") throw new Error("Return to the main branch before completing this step.");
+            if (!new_head || new_head !== expected_head) throw new Error("HEAD is not at the latest commit on main.");
+            if (previous_head && previous_head === new_head) throw new Error("HEAD did not move to the latest commit.");
 
       - name: Update comment - step results
         uses: GrantBirki/comment@v2.1.1

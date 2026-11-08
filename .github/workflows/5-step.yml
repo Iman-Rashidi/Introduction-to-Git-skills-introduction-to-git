@@ -4,6 +4,9 @@ on:
   repository_dispatch:
     types:
       - post-merge
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -27,7 +30,7 @@ jobs:
       ISSUE_NUMBER: ${{ needs.find_exercise.outputs.issue-number }}
 
     # Don't check unless at least 10 commits have been made
-    if: ${{ github.event.client_payload.branch_commit_count >= 10 }}
+    if: ${{ (github.event_name == 'repository_dispatch' && github.event.client_payload.branch_commit_count >= 10) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(toJson(github.event.commits), 'tracker') && contains(toJson(github.event.commits), 'calculate level')) }}
 
     steps:
       - name: Checkout
@@ -64,7 +67,7 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@v6
         env:
-          commit_messages: ${{ toJson(github.event.client_payload.branch_commit_messages) }}
+          commit_messages: ${{ toJson(github.event.client_payload.branch_commit_messages || github.event.commits) }}
           keyword: "tracker"
         with:
           script: |
@@ -87,7 +90,7 @@ jobs:
         continue-on-error: true
         uses: actions/github-script@v6
         env:
-          commit_messages: ${{ toJson(github.event.client_payload.branch_commit_messages) }}
+          commit_messages: ${{ toJson(github.event.client_payload.branch_commit_messages || github.event.commits) }}
           keyword: "calculate level"
         with:
           script: |

@@ -9,7 +9,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
   actions: write
   issues: write
 
@@ -129,6 +129,14 @@ jobs:
       - name: Fail job if not all checks passed
         if: contains(steps.*.outcome, 'failure')
         run: exit 1
+
+      - name: Delete merged feature branches
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api --method DELETE "repos/${{ github.repository }}/git/refs/heads/fix-incomplete-high-score"
+          gh api --method DELETE "repos/${{ github.repository }}/git/refs/heads/add-level-counter"
 
   post_next_step_content:
     name: Post next step content

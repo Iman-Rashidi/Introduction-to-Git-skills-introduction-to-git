@@ -4,9 +4,6 @@ on:
   repository_dispatch:
     types:
       - post-checkout
-  push:
-    branches:
-      - main
 
 permissions:
   contents: read
